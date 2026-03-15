@@ -334,15 +334,18 @@ async function getGeminiMdFilePathsInternalForEachDir(
         ...fileFilteringOptions,
       };
 
-      const downwardPaths = await bfsFileSearch(resolvedCwd, {
-        fileName: geminiMdFilename,
-        maxDirs,
-        fileService,
-        fileFilteringOptions: mergedOptions,
-      });
-      downwardPaths.sort();
-      for (const dPath of downwardPaths) {
-        projectPaths.add(normalizePath(dPath));
+      const resolvedHome = normalizePath(userHomePath);
+      if (resolvedCwd !== resolvedHome) {
+        const downwardPaths = await bfsFileSearch(resolvedCwd, {
+          fileName: geminiMdFilename,
+          maxDirs,
+          fileService,
+          fileFilteringOptions: mergedOptions,
+        });
+        downwardPaths.sort();
+        for (const dPath of downwardPaths) {
+          projectPaths.add(normalizePath(dPath));
+        }
       }
     }
   }
@@ -607,9 +610,12 @@ export async function loadServerHierarchicalMemory(
   const realHome = normalizePath(await fs.realpath(path.resolve(homedir())));
   const isHomeDirectory = realCwd === realHome;
 
-  // If it is the home directory, pass an empty string to the core memory
-  // function to signal that it should skip the workspace search.
-  currentWorkingDirectory = isHomeDirectory ? '' : currentWorkingDirectory;
+  // We do not clear the currentWorkingDirectory for the home directory anymore.
+  // This ensures that the GEMINI.md in the home directory is correctly discovered
+  // during the project memory scan.
+  // Performance is maintained by skipping the recursive downward search (BFS)
+  // in the next step when the directory is recognized as the home directory.
+  // currentWorkingDirectory = isHomeDirectory ? '' : currentWorkingDirectory;
 
   debugLogger.debug(
     '[DEBUG] [MemoryDiscovery] Loading server hierarchical memory for CWD:',
