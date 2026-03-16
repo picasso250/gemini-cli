@@ -257,9 +257,9 @@ async function getGeminiMdFilePathsInternalForEachDir(
   const globalPaths = new Set<string>();
   const projectPaths = new Set<string>();
   const geminiMdFilenames = getAllGeminiMdFilenames();
+  const resolvedHome = normalizePath(userHomePath);
 
   for (const geminiMdFilename of geminiMdFilenames) {
-    const resolvedHome = normalizePath(userHomePath);
     const globalGeminiDir = normalizePath(path.join(resolvedHome, GEMINI_DIR));
     const globalMemoryPath = normalizePath(
       path.join(globalGeminiDir, geminiMdFilename),
@@ -334,15 +334,17 @@ async function getGeminiMdFilePathsInternalForEachDir(
         ...fileFilteringOptions,
       };
 
-      const downwardPaths = await bfsFileSearch(resolvedCwd, {
-        fileName: geminiMdFilename,
-        maxDirs,
-        fileService,
-        fileFilteringOptions: mergedOptions,
-      });
-      downwardPaths.sort();
-      for (const dPath of downwardPaths) {
-        projectPaths.add(normalizePath(dPath));
+      if (resolvedCwd !== resolvedHome) {
+        const downwardPaths = await bfsFileSearch(resolvedCwd, {
+          fileName: geminiMdFilename,
+          maxDirs,
+          fileService,
+          fileFilteringOptions: mergedOptions,
+        });
+        downwardPaths.sort();
+        for (const dPath of downwardPaths) {
+          projectPaths.add(normalizePath(dPath));
+        }
       }
     }
   }
@@ -600,17 +602,6 @@ export async function loadServerHierarchicalMemory(
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
-  // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
-  const realCwd = normalizePath(
-    await fs.realpath(path.resolve(currentWorkingDirectory)),
-  );
-  const realHome = normalizePath(await fs.realpath(path.resolve(homedir())));
-  const isHomeDirectory = realCwd === realHome;
-
-  // If it is the home directory, pass an empty string to the core memory
-  // function to signal that it should skip the workspace search.
-  currentWorkingDirectory = isHomeDirectory ? '' : currentWorkingDirectory;
-
   debugLogger.debug(
     '[DEBUG] [MemoryDiscovery] Loading server hierarchical memory for CWD:',
     currentWorkingDirectory,
