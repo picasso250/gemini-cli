@@ -257,9 +257,9 @@ async function getGeminiMdFilePathsInternalForEachDir(
   const globalPaths = new Set<string>();
   const projectPaths = new Set<string>();
   const geminiMdFilenames = getAllGeminiMdFilenames();
+  const resolvedHome = normalizePath(userHomePath);
 
   for (const geminiMdFilename of geminiMdFilenames) {
-    const resolvedHome = normalizePath(userHomePath);
     const globalGeminiDir = normalizePath(path.join(resolvedHome, GEMINI_DIR));
     const globalMemoryPath = normalizePath(
       path.join(globalGeminiDir, geminiMdFilename),
@@ -334,7 +334,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
         ...fileFilteringOptions,
       };
 
-      const resolvedHome = normalizePath(userHomePath);
       if (resolvedCwd !== resolvedHome) {
         const downwardPaths = await bfsFileSearch(resolvedCwd, {
           fileName: geminiMdFilename,
@@ -603,20 +602,6 @@ export async function loadServerHierarchicalMemory(
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
-  // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
-  const realCwd = normalizePath(
-    await fs.realpath(path.resolve(currentWorkingDirectory)),
-  );
-  const realHome = normalizePath(await fs.realpath(path.resolve(homedir())));
-  const isHomeDirectory = realCwd === realHome;
-
-  // We do not clear the currentWorkingDirectory for the home directory anymore.
-  // This ensures that the GEMINI.md in the home directory is correctly discovered
-  // during the project memory scan.
-  // Performance is maintained by skipping the recursive downward search (BFS)
-  // in the next step when the directory is recognized as the home directory.
-  // currentWorkingDirectory = isHomeDirectory ? '' : currentWorkingDirectory;
-
   debugLogger.debug(
     '[DEBUG] [MemoryDiscovery] Loading server hierarchical memory for CWD:',
     currentWorkingDirectory,
